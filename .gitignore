@@ -1,0 +1,4 @@
+dist/
+__pycache__/
+_to_delete/
+Claude outputs/
