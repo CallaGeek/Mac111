@@ -30,6 +30,19 @@ def parse_page(path):
             body_lines.append(line)
     return meta, "\n".join(body_lines).strip()
 
+LINK_RE = re.compile(r'((?:href|src|content)=")/(?!/)([^"]*)"')
+
+def relativise(html, depth):
+    """Rewrite root-absolute URLs (/assets/x, /about/) to relative ones so the
+    site works at a sub-path (user.github.io/repo/), on the custom domain and
+    from disk. depth = number of folders below dist/ the page sits in."""
+    prefix = "../" * depth if depth else "./"
+    def fix(m):
+        path = m.group(2)
+        if path.startswith("http"): return m.group(0)
+        return f'{m.group(1)}{prefix}{path}"'
+    return LINK_RE.sub(fix, html)
+
 def render(template, ctx):
     for k, v in ctx.items():
         template = template.replace("{{" + k + "}}", v)
@@ -84,9 +97,14 @@ def main():
         })
         if slug in ("index", "404"):
             out = DIST / f"{slug}.html"          # GitHub Pages serves /404.html for missing pages
+            depth = 0
         else:
             (DIST / slug).mkdir(parents=True, exist_ok=True)
             out = DIST / slug / "index.html"
+            depth = 1
+        # canonical/og:url must stay absolute — protect them, relativise the rest
+        html = html.replace('href="https://mac111.nz', 'href="ABS_KEEP').replace('content="https://mac111.nz', 'content="ABS_KEEP')
+        html = relativise(html, depth).replace("ABS_KEEP", "https://mac111.nz")
         out.write_text(html, encoding="utf-8")
         print("built", url)
 
